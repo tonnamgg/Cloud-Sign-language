@@ -1,124 +1,128 @@
 # Sign Language Game
 
-เว็บแอปเกมฝึกภาษามือด้วย React + TypeScript + Vite
+เว็บแอปเกมฝึกภาษามือด้วย React + FastAPI + AI Sign Detection
 
 ## ภาพรวม
 
-โปรเจกต์นี้เป็นเกมฝึกภาษามือที่ใช้กล้องเว็บแคมเพื่ออ่านท่าทางผู้เล่นแบบเรียลไทม์ พร้อม UI สำหรับ:
+โปรเจกต์นี้เป็นเกมฝึกภาษามือที่ใช้กล้องเว็บแคมเพื่ออ่านท่าทางผู้เล่นแบบเรียลไทม์ ประกอบด้วย:
 
-- หน้า Home
-- หน้า Game (กล้อง + โจทย์ + จับเวลา)
-- หน้า Leaderboard
+- **Frontend** — React 19 + TypeScript + Vite + Tailwind CSS
+- **Backend** — FastAPI + AI model (SiglipForImageClassification)
+- หน้า Home, Game (กล้อง + โจทย์ + จับเวลา), Leaderboard
 
-หมายเหตุ: ตอนนี้โค้ดยังเป็น Frontend-centric และมี mock data อยู่ในแอป เหมาะสำหรับพัฒนาและเดโมก่อนเชื่อม Backend จริง
+หมายเหตุ: ตอนนี้ Backend ใช้ in-memory mock data (ไม่มี database) เหมาะสำหรับพัฒนาและเดโม
 
 ## Tech Stack
 
-- React 19
-- TypeScript
-- Vite
+### Frontend
+- React 19 / TypeScript / Vite
 - Tailwind CSS 4
 - Lucide React
+
+### Backend
+- FastAPI + Uvicorn
+- Transformers (HuggingFace) + PyTorch
+- Pillow
 
 ## โครงสร้างหลัก
 
 ```text
 sign-language-game/
-  public/
-  src/
-    App.tsx
-    main.tsx
-    index.css
-    App.css
-    assets/
-  index.html
-  package.json
-  vite.config.ts
+  frontend/
+    src/
+      App.tsx
+      main.tsx
+      index.css
+      App.css
+      assets/
+    index.html
+    package.json
+    vite.config.ts
+  backend/
+    main.py
+    requirements.txt
+    app/
+      api/
+        auth.py        # mock auth (dev-user)
+        game.py        # game start/submit/detect
+        leaderboard.py # in-memory mock leaderboard
+        user.py        # in-memory mock users
+      ai/
+        model.py       # AI sign language detection
+      core/
+        game.py        # game logic
+        scoring.py     # score calculation
+        word.py        # random word generator
+      db/              # (ยังไม่ใช้ — เตรียมไว้สำหรับ DB จริง)
+        database.py
+        models.py
+      schema/
+        user_schema.py
+      utils/
+        timer.py
 ```
 
 ## เริ่มต้นใช้งาน
 
-### 1) ติดตั้ง dependencies
+### Backend
 
 ```bash
-npm install
+cd backend
+python -m venv .venv
+.venv\Scripts\activate        # Windows
+# source .venv/bin/activate   # macOS/Linux
+pip install fastapi uvicorn transformers torch torchvision Pillow
+uvicorn main:app --reload
 ```
 
-### 2) รันโหมดพัฒนา
+Backend รันที่ `http://localhost:8000` — ดู API docs ที่ `http://localhost:8000/docs`
+
+### Frontend
 
 ```bash
+cd frontend
+npm install
 npm run dev
 ```
 
-หลังรันสำเร็จ เปิด URL ที่ Vite แสดงใน terminal (ปกติ `http://localhost:5173`)
+Frontend รันที่ `http://localhost:5173`
 
-### 3) Build สำหรับ production
+## API Endpoints
 
-```bash
-npm run build
-```
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/game/start` | เริ่มเกมใหม่ |
+| POST | `/game/submit` | ส่งรูปเพื่อตรวจคำตอบ |
+| POST | `/game/detect` | ตรวจจับท่ามือ (ไม่เปลี่ยน state) |
+| POST | `/user/me` | สร้าง/ดึงข้อมูลผู้ใช้ |
+| POST | `/leaderboard/score` | บันทึกคะแนน |
+| GET | `/leaderboard/leaderboard` | ดู leaderboard (top 10) |
 
-### 4) Preview ไฟล์ build
-
-```bash
-npm run preview
-```
-
-## Scripts ที่ใช้บ่อย
+## Scripts ที่ใช้บ่อย (Frontend)
 
 - `npm run dev` : รัน development server
 - `npm run build` : ตรวจ TypeScript และ build production
 - `npm run preview` : preview ไฟล์จาก `dist`
 - `npm run lint` : ตรวจ lint
 
-## Backend Ready (แนวทางแนะนำ)
-
-ตอนนี้ใน `src/App.tsx` มี logic เรียก AI และข้อมูล mock อยู่ในไฟล์เดียวกัน
-เพื่อเตรียมพร้อมต่อ backend ควรแยกเป็นชั้นดังนี้:
-
-1. `src/types.ts`
-2. `src/api.ts`
-3. `src/App.tsx` ให้เรียกผ่านฟังก์ชันจาก `api.ts`
-
-ตัวอย่างรูปแบบ endpoint ที่แนะนำ:
-
-- `GET /api/prompts`
-- `GET /api/leaderboard`
-- `POST /api/score`
-- `POST /api/gesture/validate`
-
-และแนะนำให้ใช้ environment variable:
-
-```env
-VITE_API_BASE_URL=http://localhost:8080
-```
-
-จากนั้นเรียกผ่าน `import.meta.env.VITE_API_BASE_URL`
-
-## Docker (ไม่บังคับ แต่แนะนำ)
-
-ถ้าต้องการให้ทีมอื่นรันได้ง่ายและ environment ตรงกัน ควรทำ Docker โดยเฉพาะตอนเริ่มมี Backend
-
-- ตอนนี้ (frontend only): ใช้ Node + npm install + npm run dev ได้เลย
-- ตอนมี backend: ใช้ `docker-compose` เพื่อรัน frontend + backend พร้อมกัน
-
 ## ปัญหาที่พบบ่อย
 
 1. กล้องไม่ขึ้น:
-- ตรวจว่า browser อนุญาตสิทธิ์กล้องแล้ว
-- ทดสอบบน `localhost` หรือ HTTPS
+   - ตรวจว่า browser อนุญาตสิทธิ์กล้องแล้ว
+   - ทดสอบบน `localhost` หรือ HTTPS
 
-2. รัน `npm run dev` ไม่ได้:
-- ลองลบ `node_modules` และ `package-lock.json` แล้วติดตั้งใหม่
-- ใช้ Node.js เวอร์ชัน LTS ล่าสุด
+2. `No module named 'transformers'`:
+   - ตรวจว่า activate venv ถูกตัว แล้ว `pip install transformers torch torchvision Pillow`
 
-3. Build fail เพราะ TypeScript:
-- รัน `npm run build` เพื่อดู error แบบครบ
-- แก้ type และ import ให้ถูกต้องก่อน deploy
+3. `No module named uvicorn`:
+   - `pip install uvicorn fastapi`
+
+4. Build fail เพราะ TypeScript:
+   - รัน `npm run build` เพื่อดู error แบบครบ
 
 ## แนวทางพัฒนาต่อ
 
-- แยก service layer สำหรับ API
-- เพิ่ม error boundary และ loading states ในทุกหน้า
-- เพิ่มระบบ login และผูกคะแนนกับผู้ใช้จริง
+- เชื่อม Database จริง (SQLAlchemy models เตรียมไว้แล้วใน `db/`)
+- เพิ่มระบบ login (AWS Cognito) และผูกคะแนนกับผู้ใช้จริง
+- Docker / docker-compose สำหรับ deploy
 - เขียน test (unit + integration)
