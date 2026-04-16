@@ -1,20 +1,20 @@
 from fastapi import APIRouter, Depends
-from app.api.auth import get_current_user
+from sqlalchemy.orm import Session
+
+from app.db.database import get_db
+from app.api.auth import verify_token
+from app.services.user_service import get_or_create_user
 
 router = APIRouter()
 
-# In-memory mock users
-mock_users: list[dict] = []
+@router.get("/me")
+def get_me(
+    payload=Depends(verify_token),
+    db: Session = Depends(get_db)
+):
+    user = get_or_create_user(db, payload)
 
-
-@router.post("/me")
-def create_or_get_user(current=Depends(get_current_user)):
-    existing = next((u for u in mock_users if u["cognito_id"] == current["cognito_id"]), None)
-    if not existing:
-        existing = {
-            "id": len(mock_users) + 1,
-            "cognito_id": current["cognito_id"],
-            "username": current["username"],
-        }
-        mock_users.append(existing)
-    return existing
+    return {
+        "id": user.id,
+        "username": user.username
+    }
