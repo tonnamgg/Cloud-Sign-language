@@ -1,11 +1,11 @@
 import requests
 from jose import jwt
 from fastapi import HTTPException, Header
+import os
 
-# 🔥 Replace with your values
-COGNITO_REGION = "ap-southeast-1"
-USER_POOL_ID = "your_user_pool_id"
-APP_CLIENT_ID = "your_app_client_id"
+COGNITO_REGION = os.getenv("COGNITO_REGION")
+USER_POOL_ID = os.getenv("USER_POOL_ID")
+APP_CLIENT_ID = os.getenv("APP_CLIENT_ID")
 
 JWKS_URL = f"https://cognito-idp.{COGNITO_REGION}.amazonaws.com/{USER_POOL_ID}/.well-known/jwks.json"
 
