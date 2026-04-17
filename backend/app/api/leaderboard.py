@@ -1,23 +1,33 @@
 from fastapi import APIRouter, Depends
-from sqlalchemy import func
-from sqlalchemy.orm import Session
-from app.db.database import get_db
-from app.db.models import User, Score
+from app.api.auth import verify_token
+from pydantic import BaseModel
 
 router = APIRouter()
 
 
+class ScoreSubmission(BaseModel):
+    score: int
+
+
 @router.get("/leaderboard")
-def leaderboard(db: Session = Depends(get_db)):
-    results = (
-        db.query(User.username, func.max(Score.score).label("best_score"))
-        .join(Score)
-        .group_by(User.username)
-        .order_by(func.max(Score.score).desc())
-        .limit(10)
-        .all()
-    )
+def leaderboard():
+    # Mock data - DB not connected
     return [
-        {"rank": i + 1, "name": s[0], "score": s[1]}
-        for i, s in enumerate(results)
+        {"rank": 1, "name": "MockUser1", "score": 100},
+        {"rank": 2, "name": "MockUser2", "score": 80},
     ]
+
+
+@router.post("/score")
+def save_score(
+    score_data: ScoreSubmission,
+    token_payload=Depends(verify_token)
+):
+    # Mock - DB not connected
+    username = token_payload.get("cognito:username") or token_payload.get("username") or "unknown"
+    return {
+        "id": 1,
+        "score": score_data.score,
+        "user_id": token_payload.get("sub", "mock"),
+        "username": username
+    }

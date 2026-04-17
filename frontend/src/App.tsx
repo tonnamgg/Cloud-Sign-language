@@ -1,5 +1,7 @@
 ﻿import React, { useState, useRef, useEffect } from 'react';
-import { Home, Play, Trophy, Camera, CheckCircle2, HeartHandshake, Zap, Award, VideoOff, LogIn, LogOut, User } from 'lucide-react';
+import { Home, Play, Trophy, Camera, CheckCircle2, HeartHandshake, Zap, Award, VideoOff, LogOut, User } from 'lucide-react';
+import { Authenticator, useAuthenticator } from '@aws-amplify/ui-react';
+import '@aws-amplify/ui-react/styles.css';
 
 const API_BASE = 'http://localhost:8000';
 
@@ -64,24 +66,54 @@ function generateWordList(): string[] {
 
 type PageState = 'home' | 'game' | 'rank';
 
-// Mock user for demo
-interface MockUser {
-  name: string;
-  email: string;
+const SESSION_LOG_INTERVAL = 30; // วินาที
+
+async function getToken(): Promise<string | null> {
+  try {
+    const { fetchAuthSession } = await import('aws-amplify/auth');
+    const session = await fetchAuthSession();
+    return session.tokens?.idToken?.toString() ?? null;
+  } catch {
+    return null;
+  }
 }
 
-export default function App() {
+async function callAuthLog(endpoint: string) {
+  try {
+    const token = await getToken();
+    if (!token) return;
+    await fetch(`${API_BASE}/user/${endpoint}`, {
+      method: endpoint === 'session-check' ? 'GET' : 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch {
+    // ไม่ block การทำงานหลัก
+  }
+}
+
+function AppContent() {
+  const { user, signOut } = useAuthenticator((context) => [context.user]);
   const [currentPage, setCurrentPage] = useState<PageState>('home');
-  const [user, setUser] = useState<MockUser | null>(null);
 
-  const handleLogin = () => {
-    // Mock login — just set a fake user
-    setUser({ name: 'Player', email: 'player@signbridge.app' });
-  };
+  // เรียก login-log เมื่อ user เข้ามา
+  useEffect(() => {
+    if (user) {
+      callAuthLog('login-log');
+    }
+  }, [user?.userId]);
 
-  const handleLogout = () => {
-    setUser(null);
-    setCurrentPage('home');
+  // session-check ทุก SESSION_LOG_INTERVAL วินาที
+  useEffect(() => {
+    if (!user) return;
+    const interval = setInterval(() => {
+      callAuthLog('session-check');
+    }, SESSION_LOG_INTERVAL * 1000);
+    return () => clearInterval(interval);
+  }, [user]);
+
+  const handleLogout = async () => {
+    await callAuthLog('logout-log');
+    signOut();
   };
 
   return (
@@ -108,29 +140,21 @@ export default function App() {
               </button>
 
               {/* Login / User menu */}
-              {user ? (
-                <div className="flex items-center space-x-2 ml-2 pl-4 border-l border-slate-200">
-                  <div className="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center">
-                    <User className="h-4 w-4 text-indigo-600" />
-                  </div>
-                  <span className="text-sm font-medium text-slate-700 hidden sm:inline">{user.name}</span>
-                  <button
-                    onClick={handleLogout}
-                    className="p-2 rounded-md text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-                    title="ออกจากระบบ"
-                  >
-                    <LogOut className="h-4 w-4" />
-                  </button>
+              <div className="flex items-center space-x-2 ml-2 pl-4 border-l border-slate-200">
+                <div className="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center">
+                  <User className="h-4 w-4 text-indigo-600" />
                 </div>
-              ) : (
+                <span className="text-sm font-medium text-slate-700 hidden sm:inline">
+                  {user?.username || 'ผู้ใช้'}
+                </span>
                 <button
-                  onClick={handleLogin}
-                  className="flex items-center gap-2 ml-2 px-4 py-2 text-sm font-bold rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 transition-colors shadow-sm"
+                  onClick={handleLogout}
+                  className="p-2 rounded-md text-slate-500 hover:text-red-500 hover:bg-slate-50 transition-colors"
+                  title="ออกจากระบบ"
                 >
-                  <LogIn className="h-4 w-4" />
-                  <span className="hidden sm:inline">เข้าสู่ระบบ</span>
+                  <LogOut className="h-5 w-5" />
                 </button>
-              )}
+              </div>
             </div>
           </div>
         </div>
@@ -142,6 +166,14 @@ export default function App() {
         {currentPage === 'rank' && <LeaderboardView />}
       </main>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <Authenticator signUpAttributes={['email']}>
+      <AppContent />
+    </Authenticator>
   );
 }
 
@@ -231,12 +263,13 @@ function GameView({ onQuit }: GameViewProps) {
     if (scoreSavedRef.current) return;
     scoreSavedRef.current = true;
     try {
-      await fetch(`${API_BASE}/leaderboard/score?score=${finalScore}`, {
-        method: 'POST',
-        headers: { 'X-User-Id': 'player' },
-      });
-    } catch (err) {
-      console.warn('Failed to save score:', err);
+      const { apiService } = await import('./services/api');
+      const response = await apiService.post('/leaderboard/score', { score: finalScore });
+      console.log('✅ Score saved successfully:', response);
+    } catch (err: any) {
+      console.error('❌ Failed to save score:', err.message || err);
+      // Don't break the game flow, just warn user in console
+      console.warn('⚠️  Score may not have been saved. Make sure you are logged in.');
     }
   };
 
@@ -489,17 +522,36 @@ function GameView({ onQuit }: GameViewProps) {
 }
 
 function LeaderboardView() {
-  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>(MOCK_LEADERBOARD);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch(`${API_BASE}/leaderboard/leaderboard`)
-      .then(res => res.json())
-      .then((data: LeaderboardEntry[]) => {
-        if (Array.isArray(data) && data.length > 0) setLeaderboard(data);
-      })
-      .catch(() => { /* fallback to mock data */ })
-      .finally(() => setIsLoading(false));
+    const fetchLeaderboard = async () => {
+      try {
+        const { apiService } = await import('./services/api');
+        const data: LeaderboardEntry[] = await apiService.get('/leaderboard/leaderboard');
+        
+        if (Array.isArray(data) && data.length > 0) {
+          setLeaderboard(data);
+          console.log('✅ Real leaderboard loaded:', data);
+        } else {
+          setError('ยังไม่มีข้อมูลตารางคะแนน');
+          console.log('ℹ️ No leaderboard data yet');
+        }
+      } catch (err: any) {
+        console.error('❌ Failed to load leaderboard:', err);
+        setError('ไม่สามารถโหลดตารางคะแนนได้');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchLeaderboard();
+    
+    // Refresh every 5 seconds
+    const interval = setInterval(fetchLeaderboard, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   return (
@@ -512,32 +564,51 @@ function LeaderboardView() {
         <p className="text-slate-500 mt-2">{"แข่งขันและเรียนรู้ไปพร้อมกับทุกคน"}</p>
       </div>
 
+      {error && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+          <p className="text-amber-700">ℹ️ {error}</p>
+        </div>
+      )}
+
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden relative">
         <div className="absolute top-2 right-2 px-3 py-1 bg-slate-100 text-slate-400 text-xs rounded-full font-medium">
           {isLoading ? 'กำลังโหลด...' : 'Live'}
         </div>
-        <div className="divide-y divide-slate-100 mt-4">
-          {leaderboard.map((user, index) => (
-            <div
-              key={`${user.rank}-${user.name}`}
-              className={`flex items-center p-6 transition-colors hover:bg-slate-50 ${index < 3 ? 'bg-gradient-to-r from-transparent to-yellow-50/30' : ''}`}
-            >
-              <div className="w-12 font-bold text-2xl text-slate-400 text-center">
-                {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : user.rank}
-              </div>
-              <div className="ml-6 flex-1 flex items-center">
-                <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold mr-4">
-                  {user.name.charAt(0)}
+
+        {isLoading ? (
+          <div className="p-8 text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
+            <p className="mt-4 text-slate-500">กำลังโหลดข้อมูล...</p>
+          </div>
+        ) : leaderboard.length === 0 ? (
+          <div className="p-8 text-center text-slate-500">
+            <p>ยังไม่มีคะแนนในตารางอันดับ</p>
+            <p className="text-sm mt-2">เล่นเกมและส่งคะแนนของคุณ!</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-100 mt-4">
+            {leaderboard.map((user, index) => (
+              <div
+                key={`${user.rank}-${user.name}`}
+                className={`flex items-center p-6 transition-colors hover:bg-slate-50 ${index < 3 ? 'bg-gradient-to-r from-transparent to-yellow-50/30' : ''}`}
+              >
+                <div className="w-12 font-bold text-2xl text-slate-400 text-center">
+                  {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : user.rank}
                 </div>
-                <span className="font-bold text-lg text-slate-800">{user.name}</span>
+                <div className="ml-6 flex-1 flex items-center">
+                  <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold mr-4">
+                    {user.name.charAt(0)}
+                  </div>
+                  <span className="font-bold text-lg text-slate-800">{user.name}</span>
+                </div>
+                <div className="text-right">
+                  <div className="font-bold text-xl text-indigo-600">{user.score}</div>
+                  <div className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Points</div>
+                </div>
               </div>
-              <div className="text-right">
-                <div className="font-bold text-xl text-indigo-600">{user.score}</div>
-                <div className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Points</div>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

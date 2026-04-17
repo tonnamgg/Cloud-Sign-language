@@ -1,20 +1,54 @@
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
-
-from app.db.database import get_db
 from app.api.auth import verify_token
-from app.services.user_service import get_or_create_user
+from datetime import datetime
 
 router = APIRouter()
 
-@router.get("/me")
-def get_me(
-    payload=Depends(verify_token),
-    db: Session = Depends(get_db)
-):
-    user = get_or_create_user(db, payload)
+def _get_username(payload: dict) -> str:
+    return (
+        payload.get("cognito:username") or
+        payload.get("username") or
+        payload.get("email", "").split("@")[0] or
+        "unknown"
+    )
 
+@router.get("/me")
+def get_me(payload=Depends(verify_token)):
+    username = _get_username(payload)
     return {
-        "id": user.id,
-        "username": user.username
+        "id": payload.get("sub", "mock-id"),
+        "username": username
     }
+
+@router.post("/login-log")
+def login_log(payload=Depends(verify_token)):
+    username = _get_username(payload)
+    user_id = payload.get("sub", "-")
+    email = payload.get("email", "-")
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"\n{'='*50}")
+    print(f"[AUTH] LOGIN SUCCESS")
+    print(f"[AUTH] Username : {username}")
+    print(f"[AUTH] User ID  : {user_id}")
+    print(f"[AUTH] Email    : {email}")
+    print(f"[AUTH] Time     : {now}")
+    print(f"{'='*50}\n")
+    return {"status": "logged"}
+
+@router.post("/logout-log")
+def logout_log(payload=Depends(verify_token)):
+    username = _get_username(payload)
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"\n{'='*50}")
+    print(f"[AUTH] LOGOUT")
+    print(f"[AUTH] Username : {username}")
+    print(f"[AUTH] Time     : {now}")
+    print(f"{'='*50}\n")
+    return {"status": "logged"}
+
+@router.get("/session-check")
+def session_check(payload=Depends(verify_token)):
+    username = _get_username(payload)
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"[SESSION] {now} | Active user: {username}")
+    return {"username": username, "status": "active"}

@@ -9,5 +9,5 @@ numpy
 sqlalchemy
 psycopg2-binary
 python-jose
-dotenv
+python-dotenv
 requests
