@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { getCurrentUser, signOut } from 'aws-amplify/auth';
-import { isDev } from '../aws-config';
 
 interface AuthContextType {
   user: any;
@@ -32,21 +31,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const checkAuthState = async () => {
     try {
-      if (isDev) {
-        setUser({
-          username: 'jirapat',
-          signInDetails: { loginId: 'jirapat@example.com' }
-        });
-      } else {
-        // Production: get real user from Cognito
-        const currentUser = await getCurrentUser();
-        setUser(currentUser);
-        
-        // Sync user to backend database (non-blocking)
-        import('../services/api').then(({ apiService }) => {
-          apiService.get('/user/me').catch(() => {});
-        });
-      }
+      const currentUser = await getCurrentUser();
+      setUser(currentUser);
+
+      // Sync user to backend database (non-blocking)
+      import('../services/api').then(({ apiService }) => {
+        apiService.get('/user/me').catch(() => {});
+      });
     } catch (error) {
       console.debug('Not authenticated yet');
       setUser(null);
@@ -56,12 +47,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const signOutUser = async () => {
-    if (!isDev) {
-      try {
-        await signOut();
-      } catch {
-        // ignore
-      }
+    try {
+      await signOut();
+    } catch {
+      // ignore
     }
     setUser(null);
   };

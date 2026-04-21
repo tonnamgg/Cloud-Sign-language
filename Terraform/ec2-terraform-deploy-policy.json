@@ -1,0 +1,93 @@
+    {
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          "Sid": "CognitoFullAccess",
+          "Effect": "Allow",
+          "Action": "cognito-idp:*",
+          "Resource": "*"
+        },
+        {
+          "Sid": "ECSFullAccess",
+          "Effect": "Allow",
+          "Action": "ecs:*",
+          "Resource": "*"
+        },
+        {
+          "Sid": "RDSFullAccess",
+          "Effect": "Allow",
+          "Action": "rds:*",
+          "Resource": "*"
+        },
+        {
+          "Sid": "EC2AndVpcFullAccess",
+          "Effect": "Allow",
+          "Action": "ec2:*",
+          "Resource": "*"
+        },
+        {
+          "Sid": "CloudWatchLogsFullAccess",
+          "Effect": "Allow",
+          "Action": "logs:*",
+          "Resource": "*"
+        },
+        {
+          "Sid": "ELBv2FullAccess",
+          "Effect": "Allow",
+          "Action": "elasticloadbalancing:*",
+          "Resource": "*"
+        },
+        {
+          "Sid": "AmplifyFullAccess",
+          "Effect": "Allow",
+          "Action": "amplify:*",
+          "Resource": "*"
+        },
+        {
+          "Sid": "ApiGatewayFullAccess",
+          "Effect": "Allow",
+          "Action": "apigateway:*",
+          "Resource": "*"
+        },
+        {
+          "Sid": "SecretsManagerReadForAmplifyToken",
+          "Effect": "Allow",
+          "Action": [
+            "secretsmanager:GetSecretValue",
+            "secretsmanager:DescribeSecret"
+          ],
+          "Resource": "*"
+        },
+        {
+          "Sid": "IamMinimumForTerraformEcs",
+          "Effect": "Allow",
+          "Action": [
+            "iam:CreateRole",
+            "iam:DeleteRole",
+            "iam:GetRole",
+            "iam:ListAttachedRolePolicies",
+            "iam:ListRolePolicies",
+            "iam:GetRolePolicy",
+            "iam:PutRolePolicy",
+            "iam:DeleteRolePolicy",
+            "iam:AttachRolePolicy",
+            "iam:DetachRolePolicy",
+            "iam:CreateServiceLinkedRole",
+            "iam:ListInstanceProfilesForRole",
+            "iam:ListRoles"
+          ],
+          "Resource": "*"
+        },
+        {
+          "Sid": "IamPassRoleToEcsTasksOnly",
+          "Effect": "Allow",
+          "Action": "iam:PassRole",
+          "Resource": "*",
+          "Condition": {
+            "StringEquals": {
+              "iam:PassedToService": "ecs-tasks.amazonaws.com"
+            }
+          }
+        }
+      ]
+    }

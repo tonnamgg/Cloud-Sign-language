@@ -2,8 +2,7 @@
 import { Home, Play, Trophy, Camera, CheckCircle2, HeartHandshake, Zap, Award, VideoOff, LogOut, User } from 'lucide-react';
 import { Authenticator, useAuthenticator } from '@aws-amplify/ui-react';
 import '@aws-amplify/ui-react/styles.css';
-
-const API_BASE = 'http://localhost:8000';
+import { API_BASE_URL } from './config';
 
 // --- Types ---
 interface LeaderboardEntry {
@@ -42,18 +41,11 @@ const ASL_HINTS: Record<string, string> = {
   Z: 'ใช้นิ้วชี้ขีดตัว Z ในอากาศ',
 };
 
-const MOCK_LEADERBOARD: LeaderboardEntry[] = [
-  { rank: 1, name: 'Somsak P.', score: 1250 },
-  { rank: 2, name: 'Malee W.', score: 980 },
-  { rank: 3, name: 'John D.', score: 850 },
-  { rank: 4, name: 'Anna K.', score: 720 },
-  { rank: 5, name: 'Piti T.', score: 610 },
-];
-
 const TOTAL_TIME = 30;
 const LETTERS_PER_GAME = 5;
 const SCORE_PER_CORRECT = 10;
 const MAX_LIVES = 3;
+const DETECTION_INTERVAL_MS = 2500;
 
 function generateWordList(): string[] {
   const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
@@ -82,7 +74,7 @@ async function callAuthLog(endpoint: string) {
   try {
     const token = await getToken();
     if (!token) return;
-    await fetch(`${API_BASE}/user/${endpoint}`, {
+    await fetch(`${API_BASE_URL}/user/${endpoint}`, {
       method: endpoint === 'session-check' ? 'GET' : 'POST',
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -346,12 +338,13 @@ function GameView({ onQuit }: GameViewProps) {
     }, 1500);
   };
 
-  // Real-time sign detection - polls backend every 2.5 s
+  // Real-time sign detection - polls backend less aggressively to avoid overloading the backend
   useEffect(() => {
     if (gameState !== 'playing' || cameraError) return;
     let isChecking = false;
 
     const intervalId = setInterval(async () => {
+      if (document.hidden) return;
       if (
         isChecking ||
         !videoRef.current ||
@@ -372,7 +365,7 @@ function GameView({ onQuit }: GameViewProps) {
         const base64Image = canvas.toDataURL('image/jpeg', 0.6);
 
         try {
-          const res = await fetch(`${API_BASE}/game/detect`, {
+          const res = await fetch(`${API_BASE_URL}/game/detect`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ image: base64Image }),
@@ -387,7 +380,7 @@ function GameView({ onQuit }: GameViewProps) {
         }
       }
       isChecking = false;
-    }, 2500);
+    }, DETECTION_INTERVAL_MS);
 
     return () => clearInterval(intervalId);
   }, [gameState, cameraError, wordList]); // eslint-disable-line react-hooks/exhaustive-deps
