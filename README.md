@@ -1,99 +1,65 @@
-# Sign Language Game
+# Cloud Sign Language Game
 
-เว็บแอปเกมฝึกภาษามือด้วย React + FastAPI + AWS Cognito
+This project is a sign-language learning game with a React frontend, a FastAPI backend, and AWS infrastructure managed with Terraform/OpenTofu.
 
-## ภาพรวม
+## What it includes
 
-โปรเจกต์นี้เป็นเกมฝึกภาษามือ ASL (American Sign Language) ที่ใช้กล้องเว็บแคมอ่านท่าทางผู้เล่นแบบเรียลไทม์ ผู้ใช้ต้อง login ผ่าน AWS Cognito ก่อนเข้าใช้งาน
+- Frontend: React + TypeScript + Vite
+- Backend: FastAPI + Uvicorn
+- Authentication: AWS Cognito
+- Hosting: AWS Amplify for the frontend
+- Deployment: AWS ECS, RDS, API Gateway, Cognito, and related networking resources through Terraform
 
-- **Frontend** — React 19 + TypeScript + Vite + Tailwind CSS + AWS Amplify UI
-- **Backend** — FastAPI + JWT verification ผ่าน Cognito JWKS
-- หน้า Home, Game (กล้อง + โจทย์ + จับเวลา), Leaderboard
-
-> **หมายเหตุ:** Backend ปัจจุบันใช้ mock data (RDS ยังไม่ได้เชื่อมต่อ)
-
-## Tech Stack
-
-### Frontend
-- React 19 / TypeScript / Vite
-- Tailwind CSS 4
-- Lucide React
-- AWS Amplify v6 + `@aws-amplify/ui-react`
-
-### Backend
-- FastAPI + Uvicorn
-- python-jose (JWT verification)
-- AWS Cognito (User Pool)
-
-## Authentication
-
-โปรเจกต์ใช้ **AWS Cognito** สำหรับ authentication:
-- Login / Create Account ผ่าน Cognito Hosted UI (Amplify `Authenticator` component)
-- Backend ตรวจสอบ JWT token ทุก request ผ่าน Cognito JWKS endpoint
-- Session log แสดงใน terminal ของ backend (login / logout / session check ทุก 30 วินาที)
-
-## โครงสร้างหลัก
+## Project layout
 
 ```text
-sign-language-game/
-  frontend/
-    .env                  # ไม่ถูก push (ดู .env.example)
-    .env.example          # template สำหรับตั้งค่า
-    src/
-      App.tsx             # main app + Authenticator
-      main.tsx            # entry point
-      aws-config.ts       # Amplify configure
-  backend/
-    .env                  # ไม่ถูก push
-    .env.example          # template สำหรับตั้งค่า
-    main.py
-    requirements.txt
-    app/
-      api/
-        auth.py           # JWT verify ผ่าน Cognito JWKS
-        user.py           # /me, /login-log, /logout-log, /session-check
-        leaderboard.py    # mock leaderboard
-        game.py           # game endpoints
-      core/
-        game.py
-        scoring.py
-        word.py
-      db/
-        database.py
-        models.py
+Cloud-Sign-language/
+    backend/        FastAPI application
+    frontend/       React application
+    Terraform/      Infrastructure as code
 ```
 
-## เริ่มต้นใช้งาน
+## Requirements
 
-### 1. ตั้งค่า Environment Variables
+- Node.js 18 or newer
+- Python 3.10 or newer
+- AWS account with permissions for ECS, RDS, Cognito, Amplify, IAM, VPC, and API Gateway
+- Terraform 1.6+ or OpenTofu 1.6+
+- GitHub repository for Amplify hosting
+- A GitHub access token is mandatory if you want Terraform to build and deploy Amplify for you
 
-**Frontend** — สร้างไฟล์ `frontend/.env` จาก `frontend/.env.example`:
+## Local development
+
+### 1. Backend
+
+Create `backend/.env` from `backend/.env.example` and fill in the Cognito values.
+
 ```env
-VITE_COGNITO_REGION=ap-southeast-1
-VITE_USER_POOL_ID=<your-user-pool-id>
-VITE_APP_CLIENT_ID=<your-app-client-id>
-```
-
-**Backend** — สร้างไฟล์ `backend/.env` จาก `backend/.env.example`:
-```env
-COGNITO_REGION=ap-southeast-1
+COGNITO_REGION=us-east-1
 USER_POOL_ID=<your-user-pool-id>
 APP_CLIENT_ID=<your-app-client-id>
 ```
 
-### 2. Backend
+Run the backend:
 
 ```bash
 cd backend
 python -m venv .venv
-.venv\Scripts\activate        # Windows
+.venv\Scripts\activate
 pip install -r requirements.txt
 python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Backend รันที่ `http://localhost:8000` — API docs ที่ `http://localhost:8000/docs`
+Backend URL:
 
-### 3. Frontend
+- API: `http://localhost:8000`
+- Docs: `http://localhost:8000/docs`
+
+### 2. Frontend
+
+Create `frontend/.env` from `frontend/.env.example` and set your Cognito values.
+
+Run the frontend:
 
 ```bash
 cd frontend
@@ -101,46 +67,72 @@ npm install
 npm run dev
 ```
 
-Frontend รันที่ `http://localhost:5173`
+Frontend URL:
 
-## API Endpoints
+- `http://localhost:5173`
 
-| Method | Path | Description | Auth |
-|--------|------|-------------|------|
-| GET | `/user/me` | ดึงข้อมูล user ปัจจุบัน | Required |
-| POST | `/user/login-log` | บันทึก login log ใน terminal | Required |
-| POST | `/user/logout-log` | บันทึก logout log ใน terminal | Required |
-| GET | `/user/session-check` | ตรวจสอบ session (ทุก 30s) | Required |
-| GET | `/leaderboard/leaderboard` | ดู leaderboard | - |
-| POST | `/leaderboard/score` | บันทึกคะแนน | Required |
-| POST | `/game/start` | เริ่มเกมใหม่ | Required |
-| POST | `/game/detect` | ตรวจจับท่ามือ | Required |
+## Deploy to AWS
 
-## Scripts ที่ใช้บ่อย (Frontend)
+The Terraform configuration is in `Terraform/`. Update `terraform.tfvars` from `terraform.tfvars.example` before applying.
 
-- `npm run dev` : รัน development server
-- `npm run build` : ตรวจ TypeScript และ build production
-- `npm run preview` : preview ไฟล์จาก `dist`
-- `npm run lint` : ตรวจ lint
+### 1. Prepare `terraform.tfvars`
 
-## ปัญหาที่พบบ่อย
+Set these required values:
 
-1. กล้องไม่ขึ้น:
-   - ตรวจว่า browser อนุญาตสิทธิ์กล้องแล้ว
-   - ทดสอบบน `localhost` หรือ HTTPS
+```hcl
+aws_region = "us-east-1"
+db_password = "ChangeMe123!"
+image_uri   = "<your-ecr-image-uri>"
 
-2. `No module named 'transformers'`:
-   - ตรวจว่า activate venv ถูกตัว แล้ว `pip install transformers torch torchvision Pillow`
+amplify_project_name = "Cloud-Sign-Language"
+amplify_app_name     = "Cloud-Sign-Language-frontend"
+amplify_repository   = "https://github.com/<your-org>/<your-repo>"
+amplify_branch_name  = "main"
+amplify_app_root     = "frontend"
 
-3. `No module named uvicorn`:
-   - `pip install uvicorn fastapi`
+cognito_domain_prefix = "cloud-sign-language-auth-unique-prefix"
+cognito_callback_urls = ["http://localhost:5173"]
+cognito_logout_urls   = ["http://localhost:5173"]
 
-4. Build fail เพราะ TypeScript:
-   - รัน `npm run build` เพื่อดู error แบบครบ
+api_cors_allowed_origins = ["http://localhost:5173"]
+```
 
-## แนวทางพัฒนาต่อ
+If you want Terraform to manage the Amplify build, store the GitHub access token in AWS Secrets Manager and set `amplify_access_token_secret_name`.
 
-- เชื่อม Database จริง (SQLAlchemy models เตรียมไว้แล้วใน `db/`)
-- เพิ่มระบบ login (AWS Cognito) และผูกคะแนนกับผู้ใช้จริง
-- Docker / docker-compose สำหรับ deploy
-- เขียน test (unit + integration)
+### 2. Build and publish the backend image
+
+Build the backend container and push it to ECR, then copy the final image URI into `image_uri`.
+
+### 3. Apply infrastructure
+
+From the `Terraform/` directory:
+
+```bash
+tofu init
+tofu plan
+tofu apply
+```
+
+If you use Terraform instead of OpenTofu, the commands are the same except for the binary name.
+
+## How to use the app
+
+1. Open the deployed frontend URL.
+2. Sign up or sign in through Cognito.
+3. Allow camera access when prompted.
+4. Start a game session and follow the sign-language prompts.
+5. View your score on the leaderboard.
+
+## API endpoints
+
+- `GET /user/me` - current user profile
+- `POST /user/login-log` - record login
+- `POST /user/logout-log` - record logout
+- `GET /user/session-check` - session heartbeat
+- `GET /leaderboard/leaderboard` - leaderboard data
+- `POST /leaderboard/score` - submit score
+- `POST /game/start` - start a game session
+- `POST /game/detect` - detect sign input
+
+
+
