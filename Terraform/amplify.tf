@@ -14,10 +14,32 @@ data "aws_secretsmanager_secret_version" "amplify_access_token" {
   secret_id = var.amplify_access_token_secret_name
 }
 
+data "aws_iam_policy_document" "amplify_assume_role" {
+  statement {
+    actions = ["sts:AssumeRole"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["amplify.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "amplify_service_role" {
+  name               = "leaderboard-amplify-service-role"
+  assume_role_policy = data.aws_iam_policy_document.amplify_assume_role.json
+}
+
+resource "aws_iam_role_policy_attachment" "amplify_service_role_policy" {
+  role       = aws_iam_role.amplify_service_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess-Amplify"
+}
+
 resource "aws_amplify_app" "frontend" {
   name         = var.amplify_app_name
   repository   = var.amplify_repository
   access_token = local.amplify_access_token_effective
+  iam_service_role_arn = aws_iam_role.amplify_service_role.arn
   platform     = "WEB"
 
   environment_variables = {
@@ -32,6 +54,8 @@ resource "aws_amplify_app" "frontend" {
     status = "200"
     target = "/index.html"
   }
+
+  depends_on = [aws_iam_role_policy_attachment.amplify_service_role_policy]
 }
 
 resource "aws_amplify_branch" "frontend" {

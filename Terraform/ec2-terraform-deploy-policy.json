@@ -85,7 +85,10 @@
           "Resource": "*",
           "Condition": {
             "StringEquals": {
-              "iam:PassedToService": "ecs-tasks.amazonaws.com"
+              "iam:PassedToService": [
+                "ecs-tasks.amazonaws.com",
+                "amplify.amazonaws.com"
+              ]
             }
           }
         }
