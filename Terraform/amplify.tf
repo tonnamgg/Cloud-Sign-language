@@ -35,6 +35,11 @@ resource "aws_iam_role_policy_attachment" "amplify_service_role_policy" {
   policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess-Amplify"
 }
 
+resource "aws_iam_role_policy_attachment" "amplify_backend_deploy_policy" {
+  role       = aws_iam_role.amplify_service_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmplifyBackendDeployFullAccess"
+}
+
 resource "aws_amplify_app" "frontend" {
   name         = var.amplify_app_name
   repository   = var.amplify_repository
@@ -55,7 +60,10 @@ resource "aws_amplify_app" "frontend" {
     target = "/index.html"
   }
 
-  depends_on = [aws_iam_role_policy_attachment.amplify_service_role_policy]
+  depends_on = [
+    aws_iam_role_policy_attachment.amplify_service_role_policy,
+    aws_iam_role_policy_attachment.amplify_backend_deploy_policy
+  ]
 }
 
 resource "aws_amplify_branch" "frontend" {
