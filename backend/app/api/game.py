@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
+
 from app.core.game import start_game, submit_answer
 from app.ai.model import predict_sign
 

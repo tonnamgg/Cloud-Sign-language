@@ -1,19 +1,9 @@
 import { fetchAuthSession } from 'aws-amplify/auth';
-import { isDev } from '../aws-config';
-
-const API_BASE = 'http://localhost:8000';
+import { API_BASE_URL } from '../config';
 
 class ApiService {
   private async getAuthHeaders(): Promise<Record<string, string>> {
     try {
-      if (isDev) {
-        // Development mode: send mock token
-        return {
-          'Authorization': 'Bearer mock-dev-token',
-          'Content-Type': 'application/json',
-        };
-      }
-
       const session = await fetchAuthSession();
       const token = session.tokens?.idToken?.toString() || session.tokens?.accessToken?.toString();
 
@@ -38,7 +28,7 @@ class ApiService {
   async get(endpoint: string) {
     const headers = await this.getAuthHeaders();
 
-    const response = await fetch(`${API_BASE}${endpoint}`, {
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       method: 'GET',
       headers,
     });
@@ -53,7 +43,7 @@ class ApiService {
   async post(endpoint: string, data: any) {
     const headers = await this.getAuthHeaders();
 
-    const response = await fetch(`${API_BASE}${endpoint}`, {
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       method: 'POST',
       headers,
       body: JSON.stringify(data),
@@ -71,7 +61,7 @@ class ApiService {
   async put(endpoint: string, data: any) {
     const headers = await this.getAuthHeaders();
 
-    const response = await fetch(`${API_BASE}${endpoint}`, {
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       method: 'PUT',
       headers,
       body: JSON.stringify(data),
@@ -87,7 +77,7 @@ class ApiService {
   async delete(endpoint: string) {
     const headers = await this.getAuthHeaders();
 
-    const response = await fetch(`${API_BASE}${endpoint}`, {
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       method: 'DELETE',
       headers,
     });
